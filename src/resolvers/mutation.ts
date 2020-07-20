@@ -1,0 +1,299 @@
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { randomBytes } from "crypto";
+import sgMail from "@sendgrid/mail";
+
+import User from "../models/user";
+import Product from "../models/product";
+import CartItem from "../models/cartItem";
+
+const Mutation = {
+  signup: async (parent: any, args: any, context: any, info: any) => {
+    const email: string = args.email.trim().toLowerCase();
+    const currentUsers = await User.find({});
+    const isEmailExist =
+      currentUsers.findIndex((user) => user.email === email) > -1;
+
+    if (isEmailExist) throw new Error("Email already exist.");
+
+    if (args.password.trim().length < 6)
+      throw new Error("Password must be at least 6 characters.");
+
+    const password: string = await bcrypt.hash(args.password, 10);
+
+    return User.create({ ...args, email, password });
+  },
+
+  login: async (parent: any, args: any, context: any, info: any) => {
+    const { email, password } = args;
+
+    const user = await User.findOne({ email })
+      .populate({
+        path: "products",
+        populate: { path: "user" },
+      })
+      .populate({
+        path: "carts",
+        populate: { path: "product" },
+      });
+
+    if (!user) throw new Error("Email not found, please sign up.");
+
+    const vaildPassword = await bcrypt.compare(password, user.password);
+
+    if (!vaildPassword) throw new Error("Invalid email or password.");
+
+    const token = jwt.sign({ userId: user.id }, String(process.env.SECRET), {
+      expiresIn: "7days",
+    });
+
+    return { user: user, jwt: token };
+  },
+
+  requestResetPassword: async (
+    parent: any,
+    args: any,
+    context: any,
+    info: any
+  ) => {
+    const { email } = args;
+    const user = await User.findOne({ email });
+    if (!user) throw new Error("Email not found, please sign up instead.");
+
+    const resetPasswordToken = randomBytes(32).toString("hex");
+    const resetTokenExpiry = Date.now() + 30 * 60 * 1000;
+
+    await User.findByIdAndUpdate(user.id, {
+      resetPasswordToken,
+      resetTokenExpiry,
+    });
+
+    sgMail.setApiKey(String(process.env.API_KEY_SENT_GRID));
+
+    const message = {
+      from: String(process.env.MY_EMAIL),
+      to: user.email,
+      subject: "Reset password link",
+      html: `
+        <div>
+          <p>Please click the link below to reset your password.</p><br/><br/>
+        <a href="http://localhost:3000/signin/resetpassword?resetPasswordToken=${resetPasswordToken}" target="blank" style="color:blue">"Click to reset your password"</a>
+        </div>
+      `,
+    };
+
+    sgMail.send(message);
+    return { message: "Please check your email to proceed reset password." };
+  },
+
+  resetPassword: async (parent: any, args: any, context: any, info: any) => {
+    const { password, token } = args;
+
+    if (password.trim().length < 6)
+      throw new Error("Password must be at least 6 characters.");
+
+    const user = await User.findOne({ resetPasswordToken: token });
+
+    if (!user) throw new Error("Invalid token, cannot reset password.");
+
+    const isTokenExpired =
+      user.resetTokenExpiry && user.resetTokenExpiry < Date.now();
+    if (isTokenExpired)
+      throw new Error("Invalid token, cannot reset password.");
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await User.findByIdAndUpdate(user.id, {
+      password: hashedPassword,
+      resetPasswordToken: undefined,
+      resetTokenExpiry: undefined,
+    });
+
+    return {
+      message: "You have successfully reset your password, please sign in.",
+    };
+  },
+
+  createProduct: async (parent: any, args: any, context: any, info: any) => {
+    const { userId } = context;
+    if (!userId) throw new Error("Please log in.");
+
+    if (args.price < 0) throw new Error("Price must is positive number.");
+
+    if (!args.description || !args.price || !args.imageUrl)
+      throw new Error("Please procide all required fileds.");
+
+    const product = await Product.create({ ...args, user: userId });
+    const user = await User.findById(userId);
+
+    if (!user) throw new Error("User Not Found.");
+
+    if (!user.products) user.products = [product];
+    else user.products.push(product);
+
+    await user.save();
+
+    return await Product.findById(product.id).populate({
+      path: "user",
+      populate: { path: "products" },
+    });
+  },
+
+  updateProduct: async (parent: any, args: any, context: any, info: any) => {
+    const { userId } = context;
+    if (!userId) throw new Error("Please log in.");
+
+    const { id, description, price, imageUrl } = args;
+
+    if (price < 0) throw new Error("Price must is positive number.");
+
+    const product = await Product.findById(id);
+    if (!product) throw new Error("Product has not found.");
+
+    if (userId !== product.user.toString())
+      throw new Error("You are not authorized.");
+
+    const updateInfo = {
+      description: description || product.description,
+      price: price || product.price,
+      imageUrl: imageUrl || product.imageUrl,
+    };
+
+    await Product.findByIdAndUpdate(id, updateInfo);
+
+    const updateProduct = await Product.findById(id).populate({
+      path: "user",
+    });
+
+    return updateProduct;
+  },
+
+  deleteProduct: async (parent: any, args: any, context: any, info: any) => {
+    const product = await Product.findById(args.id);
+    if (!product) throw new Error("Product id invalid.");
+
+    const { userId } = context;
+    if (!userId) throw new Error("Please log in.");
+
+    if (userId !== product.user.toString())
+      throw new Error("You are not authorized.");
+
+    const deleteProduct = await Product.findByIdAndDelete (product.id);
+    if (!deleteProduct) throw new Error("Product has not found.");
+
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User Not Found.");
+
+    const updatedProducts = user.products.filter(
+      (product) => product.toString() !== deleteProduct.id.toString()
+    );
+
+    await User.findByIdAndUpdate(userId, { products: updatedProducts });
+
+    const carts = await CartItem.find({ product: deleteProduct });
+    for (const cart of carts) {
+      const deleteCart = await CartItem.findByIdAndDelete(cart.id);
+      if (!deleteCart) throw new Error("CartItem has not found.");
+
+      const user = await User.findById(deleteCart.user);
+      if (!user) throw new Error("User Not Found.");
+
+      const updatedUserCarts = user.carts.filter(
+        (cartId) => cartId.toString() !== deleteCart.id.toString()
+      );
+
+      await User.findByIdAndUpdate(user.id, { carts: updatedUserCarts });
+    }
+
+    return deleteProduct;
+  },
+
+  addToCart: async (parent: any, args: any, context: any, info: any) => {
+    const { id } = args;
+    const { userId } = context;
+    if (!userId) throw new Error("Please log in.");
+
+    try {
+      const user = await User.findById(userId).populate({
+        path: "carts",
+        populate: { path: "product" },
+      });
+      if (!user) throw new Error("User Not Found.");
+
+      const findCartItemIndex = user.carts.findIndex(
+        (cartItem) => cartItem.product.id === id
+      );
+
+      if (findCartItemIndex > -1) {
+        user.carts[findCartItemIndex].quantity += 1;
+
+        await CartItem.findByIdAndUpdate(user.carts[findCartItemIndex].id, {
+          quantity: user.carts[findCartItemIndex].quantity,
+        });
+
+        const updatedCartItem = await CartItem.findById(
+          user.carts[findCartItemIndex].id
+        )
+          .populate({ path: "product" })
+          .populate({ path: "user" });
+
+        return updatedCartItem;
+      } else {
+        const product = await Product.findById(id);
+
+        if (!product) throw new Error("Product id invalid.");
+
+        const cartItem = await CartItem.create({
+          product: product,
+          quantity: 1,
+          user: user,
+        });
+
+        const newCartItem = await CartItem.findById(cartItem.id)
+          .populate({
+            path: "product",
+          })
+          .populate({
+            path: "user",
+          });
+
+        if (!newCartItem) throw new Error("Add new cartItem unsuccessful.");
+        await User.findByIdAndUpdate(userId, {
+          carts: [...user.carts, newCartItem],
+        });
+        return newCartItem;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
+  deleteCart: async (parent: any, args: any, context: any, info: any) => {
+    const { id } = args;
+    const { userId } = context;
+    if (!userId) throw new Error("Please log in.");
+
+    const cart = await CartItem.findById(id);
+    if (!cart) throw new Error("CartItem has not found.");
+
+    const user = await User.findById(userId);
+
+    if (!user) throw new Error("User Not Found.");
+
+    if (userId !== cart.user.toString())
+      throw new Error("You are not authorized.");
+
+    const deleteCart = await CartItem.findByIdAndRemove(id);
+    if (!deleteCart) throw new Error("CartItem has not found.");
+
+    const updatedUserCarts = user.carts.filter(
+      (cartId) => cartId.toString() !== deleteCart.id.toString()
+    );
+
+    await User.findByIdAndUpdate(userId, { carts: updatedUserCarts });
+
+    return deleteCart;
+  },
+};
+
+export default Mutation;
