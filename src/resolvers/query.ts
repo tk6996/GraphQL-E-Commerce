@@ -2,18 +2,24 @@ import User from "../models/user";
 import Product from "../models/product";
 
 const Query = {
-  user: async (parent: any, args: any, context: any, info: any) => {
+  user: (parent: any, args: any, context: any, info: any) => {
     const { userId } = context;
     if (!userId) throw new Error("Please log in");
 
-    return await User.findById(userId)
+    return User.findById(userId)
       .populate({
         path: "products",
+        option: { sort: { createAt: "desc" } },
         populate: { path: "user" },
       })
       .populate({
         path: "carts",
         populate: { path: "product" },
+      })
+      .populate({
+        path: "orders",
+        option: { sort: { createAt: "desc" } },
+        populate: { path: "items", populate: { path: "product" } },
       });
   },
 
@@ -27,6 +33,11 @@ const Query = {
       .populate({
         path: "carts",
         populate: { path: "product" },
+      })
+      .populate({
+        path: "orders",
+        option: { sort: { createAt: "desc" } },
+        populate: { path: "items", populate: { path: "product" } },
       }),
 
   product: (parent: any, args: any, context: any, info: any) =>

@@ -3,9 +3,17 @@ import jwt from "jsonwebtoken";
 import { randomBytes } from "crypto";
 import sgMail from "@sendgrid/mail";
 
+import {
+  retrieveCustomer,
+  createCustomer,
+  createChargeCredit,
+  createChargeInternetBanking,
+} from "../utils/omiseUtils";
 import User from "../models/user";
 import Product from "../models/product";
 import CartItem from "../models/cartItem";
+import OrderItem from "../models/orderItem";
+import Order from "../models/order";
 
 const Mutation = {
   signup: async (parent: any, args: any, context: any, info: any) => {
@@ -35,6 +43,11 @@ const Mutation = {
       .populate({
         path: "carts",
         populate: { path: "product" },
+      })
+      .populate({
+        path: "orders",
+        option: { sort: { createAt: "desc" } },
+        populate: { path: "items", populate: { path: "product" } },
       });
 
     if (!user) throw new Error("Email not found, please sign up.");
@@ -178,7 +191,7 @@ const Mutation = {
     if (userId !== product.user.toString())
       throw new Error("You are not authorized.");
 
-    const deleteProduct = await Product.findByIdAndDelete (product.id);
+    const deleteProduct = await Product.findByIdAndDelete(product.id);
     if (!deleteProduct) throw new Error("Product has not found.");
 
     const user = await User.findById(userId);
@@ -277,7 +290,6 @@ const Mutation = {
     if (!cart) throw new Error("CartItem has not found.");
 
     const user = await User.findById(userId);
-
     if (!user) throw new Error("User Not Found.");
 
     if (userId !== cart.user.toString())
@@ -293,6 +305,102 @@ const Mutation = {
     await User.findByIdAndUpdate(userId, { carts: updatedUserCarts });
 
     return deleteCart;
+  },
+
+  createOrder: async (parent: any, args: any, context: any, info: any) => {
+    const { amount, cardId, token, return_uri } = args;
+    const { userId } = context;
+    if (!userId) throw new Error("Please log in.");
+
+    const user = await User.findById(userId).populate({
+      path: "carts",
+      populate: { path: "product" },
+    });
+    if (!user) throw new Error("User Not Found.");
+
+    let customer;
+
+    if (cardId && !token && !return_uri) {
+      const cust = await retrieveCustomer(cardId);
+      if (!cust) throw new Error("Cannot process payment.");
+
+      customer = cust;
+    }
+
+    if (!cardId && token && !return_uri) {
+      const newCustomer = await createCustomer(token, user.email, user.name);
+      if (!newCustomer) throw new Error("Cannot process payment.");
+
+      customer = newCustomer;
+      const {
+        id,
+        expiration_month,
+        expiration_year,
+        brand,
+        last_digits,
+      } = newCustomer.cards.data[0];
+
+      const newCard = {
+        id: newCustomer.id,
+        cardInfo: {
+          id,
+          expiration_month,
+          expiration_year,
+          brand,
+          last_digits,
+        },
+      };
+
+      await User.findByIdAndUpdate(userId, {
+        cards: !user.cards ? [newCard] : [newCard, ...user.cards],
+      });
+    }
+
+    let charge;
+    if (token && return_uri) {
+      charge = await createChargeInternetBanking(amount, token, return_uri);
+    } else {
+      charge = await createChargeCredit(amount, customer?.id);
+    }
+    if (!charge)
+      throw new Error("Something went wrong with payment,please try again.");
+
+    const convertCartToOrder = async () => {
+      return Promise.all(
+        user.carts.map((cart) =>
+          OrderItem.create({
+            product: cart.product,
+            quantity: cart.quantity,
+            user: cart.user,
+          })
+        )
+      );
+    };
+
+    const orderItemArray = await convertCartToOrder();
+
+    const order = await Order.create({
+      user: userId,
+      items: orderItemArray.map((orderItem) => orderItem.id),
+      authorize_uri: charge.authorize_uri,
+    });
+
+    const deleteCartItems = async () => {
+      return Promise.all(
+        user.carts.map((cart) => CartItem.findByIdAndRemove(cart.id))
+      );
+    };
+
+    await deleteCartItems();
+
+    await User.findByIdAndUpdate(userId, {
+      carts: [],
+      orders: !user.orders ? [order] : [...user.orders, order],
+    });
+
+    return await Order.findById(order.id)
+      .populate({ path: "user" })
+      .populate({ path: "items", populate: { path: "product" } });
   },
 };
 
