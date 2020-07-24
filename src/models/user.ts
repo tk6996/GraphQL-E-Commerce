@@ -7,6 +7,9 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, trim: true },
   password: { type: String, required: true, trim: true },
+  providerId: {
+    type: String,
+  },
   resetPasswordToken: { type: String },
   resetTokenExpiry: { type: Number },
   products: [
@@ -59,6 +62,7 @@ export interface IUserSchema extends mongoose.Document {
   name: string;
   email: string;
   password: string;
+  providerId?: string;
   resetPasswordToken?: string;
   resetTokenExpiry?: number;
   products: IProductSchema[];
