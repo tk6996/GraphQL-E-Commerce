@@ -16,9 +16,10 @@ const createServer = async () => {
     await mongoose.connect(
       `mongodb+srv://${MOGODB_USER}:${MOGODB_PASSWORD}@my-graphql-basic.drpst.mongodb.net/${MOGODB_NAME}?retryWrites=true&w=majority`,
       {
+        useCreateIndex: true,
         useUnifiedTopology: true,
         useNewUrlParser: true,
-        useFindAndModify: true,
+        useFindAndModify: false,
       }
     );
 
