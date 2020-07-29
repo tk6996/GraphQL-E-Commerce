@@ -24,7 +24,7 @@ export interface ICartItemSchema extends mongoose.Document {
   product: IProductSchema;
   quantity: number;
   user: IUserSchema;
-  createAt?: Date;
+  createAt: Date;
 }
 
 const CartItem = mongoose.model<ICartItemSchema>("CartItem", cartItemSchema);

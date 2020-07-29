@@ -69,7 +69,7 @@ export interface IUserSchema extends mongoose.Document {
   carts: ICartItemSchema[];
   orders: IOrderSchema[];
   cards: Card[];
-  createAt?: Date;
+  createAt: Date;
 }
 
 const User = mongoose.model<IUserSchema>("User", userSchema);

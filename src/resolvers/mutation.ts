@@ -8,15 +8,17 @@ import {
   createCustomer,
   createChargeCredit,
   createChargeInternetBanking,
+  IChargesObject,
 } from "../utils/omiseUtils";
-import User from "../models/user";
-import Product from "../models/product";
-import CartItem from "../models/cartItem";
-import OrderItem from "../models/orderItem";
-import Order from "../models/order";
+import User, { IUserSchema } from "../models/user";
+import Product, { IProductSchema } from "../models/product";
+import CartItem, { ICartItemSchema } from "../models/cartItem";
+import OrderItem, { IOrderItemSchema } from "../models/orderItem";
+import Order, { IOrderSchema } from "../models/order";
 
 const Mutation = {
   signup: async (_parent: any, args: any, _context: any, _info: any) => {
+    const name: string = args.name;
     const email: string = args.email.trim().toLowerCase();
     const currentUsers = await User.find({});
     const isEmailExist =
@@ -29,7 +31,11 @@ const Mutation = {
 
     const password: string = await bcrypt.hash(args.password, 10);
 
-    return User.create({ ...args, email, password });
+    return User.create<Pick<IUserSchema, "name" | "email" | "password">>({
+      name,
+      email,
+      password,
+    });
   },
 
   login: async (_parent: any, args: any, _context: any, _info: any) => {
@@ -128,18 +134,31 @@ const Mutation = {
   },
 
   createProduct: async (_parent: any, args: any, context: any, _info: any) => {
-    const { userId } = context;
-    if (!userId) throw new Error("Please log in.");
+    const { userId }: { userId: string } = context;
 
-    if (args.price < 0) throw new Error("Price must is positive number.");
-
-    if (!args.description || !args.price || !args.imageUrl)
-      throw new Error("Please procide all required fileds.");
-
-    const product = await Product.create({ ...args, user: userId });
     const user = await User.findById(userId);
 
-    if (!user) throw new Error("User Not Found.");
+    if (!user) throw new Error("Please log in.");
+
+    const {
+      description,
+      price,
+      imageUrl,
+    }: { description: string; price: number; imageUrl: string } = args;
+
+    if (price < 0) throw new Error("Price must is positive number.");
+
+    if (!description || !price || !imageUrl)
+      throw new Error("Please enter all required fields.");
+
+    const product = await Product.create<
+      Pick<IProductSchema, "description" | "price" | "imageUrl" | "user">
+    >({
+      description,
+      price,
+      imageUrl,
+      user,
+    });
 
     if (!user.products) user.products = [product];
     else user.products.push(product);
@@ -182,7 +201,8 @@ const Mutation = {
   },
 
   deleteProduct: async (_parent: any, args: any, context: any, _info: any) => {
-    const product = await Product.findById(args.id);
+    const { id }: { id: string } = args;
+    const product = await Product.findById(id);
     if (!product) throw new Error("Product id invalid.");
 
     const { userId } = context;
@@ -222,8 +242,8 @@ const Mutation = {
   },
 
   addToCart: async (_parent: any, args: any, context: any, _info: any) => {
-    const { id } = args;
-    const { userId } = context;
+    const { id }: { id: string } = args;
+    const { userId }: { userId: string } = context;
     if (!userId) throw new Error("Please log in.");
 
     try {
@@ -256,7 +276,9 @@ const Mutation = {
 
         if (!product) throw new Error("Product id invalid.");
 
-        const cartItem = await CartItem.create({
+        const cartItem = await CartItem.create<
+          Pick<ICartItemSchema, "product" | "quantity" | "user">
+        >({
           product: product,
           quantity: 1,
           user: user,
@@ -282,8 +304,8 @@ const Mutation = {
   },
 
   deleteCart: async (_parent: any, args: any, context: any, _info: any) => {
-    const { id } = args;
-    const { userId } = context;
+    const { id }: { id: string } = args;
+    const { userId }: { userId: string } = context;
     if (!userId) throw new Error("Please log in.");
 
     const cart = await CartItem.findById(id);
@@ -308,8 +330,18 @@ const Mutation = {
   },
 
   createOrder: async (_parent: any, args: any, context: any, _info: any) => {
-    const { amount, cardId, token, return_uri } = args;
-    const { userId } = context;
+    const {
+      amount,
+      cardId,
+      token,
+      return_uri,
+    }: {
+      amount: number;
+      cardId: string | null;
+      token: string | null;
+      return_uri: string | null;
+    } = args;
+    const { userId }: { userId: string } = context;
     if (!userId) throw new Error("Please log in.");
 
     const user = await User.findById(userId).populate({
@@ -356,7 +388,7 @@ const Mutation = {
       });
     }
 
-    let charge;
+    let charge: IChargesObject | null;
     if (token && return_uri) {
       charge = await createChargeInternetBanking(amount, token, return_uri);
     } else {
@@ -368,7 +400,9 @@ const Mutation = {
     const convertCartToOrder = async () => {
       return Promise.all(
         user.carts.map((cart) =>
-          OrderItem.create({
+          OrderItem.create<
+            Pick<IOrderItemSchema, "product" | "quantity" | "user">
+          >({
             product: cart.product,
             quantity: cart.quantity,
             user: cart.user,
@@ -379,8 +413,10 @@ const Mutation = {
 
     const orderItemArray = await convertCartToOrder();
 
-    const order = await Order.create({
-      user: userId,
+    const order = await Order.create<
+      Pick<IOrderSchema, "user" | "items" | "authorize_uri">
+    >({
+      user,
       items: orderItemArray.map((orderItem) => orderItem.id),
       authorize_uri: charge.authorize_uri,
     });

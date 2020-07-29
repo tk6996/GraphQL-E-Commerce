@@ -24,7 +24,7 @@ export interface IOrderItemSchema extends mongoose.Document {
   product: IProductSchema;
   quantity: number;
   user: IUserSchema;
-  createAt?: Date;
+  createAt: Date;
 }
 
 const OrderItem = mongoose.model<IOrderItemSchema>("OrderItem", orderItemSchema);

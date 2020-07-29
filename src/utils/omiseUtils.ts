@@ -1,4 +1,4 @@
-import OmiseFn from "omise";
+import OmiseFn, { Charges } from "omise";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -33,11 +33,15 @@ export const createCustomer = (
   );
 };
 
+export interface IChargesObject extends Charges.ICharge {
+  authorize_uri?: string;
+}
+
 export const createChargeCredit = (
   amount: number,
   customer: string | undefined
 ) => {
-  return new Promise<any>((resolve, _reject) =>
+  return new Promise<IChargesObject | null>((resolve, _reject) =>
     omise.charges.create({ amount, currency: "thb", customer }, function (
       _err,
       resp
@@ -56,7 +60,7 @@ export const createChargeInternetBanking = (
   source: string | undefined,
   return_uri: string | undefined
 ) => {
-  return new Promise<any>((resolve, _reject) =>
+  return new Promise<IChargesObject | null>((resolve, _reject) =>
     omise.charges.create(
       { amount, currency: "thb", source, return_uri },
       function (_err, resp) {

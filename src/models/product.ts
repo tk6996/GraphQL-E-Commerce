@@ -18,7 +18,7 @@ export interface IProductSchema extends mongoose.Document {
   price: number;
   imageUrl: string;
   user: IUserSchema;
-  createAt?: Date;
+  createAt: Date;
 }
 
 const Product = mongoose.model<IProductSchema>("Product", productSchema);
