@@ -22,11 +22,11 @@ export const facebookAuth = async (req: any, res: any) => {
       };
       const newUser = await User.create(newUserData);
 
-      token = jwt.sign({ userId: newUser.id }, String(process.env.SECRET), {
+      token = jwt.sign({ userId: newUser.id }, process.env.SECRET!, {
         expiresIn: "7days",
       });
     } else {
-      token = jwt.sign({ userId: user.id }, String(process.env.SECRET), {
+      token = jwt.sign({ userId: user.id }, process.env.SECRET!, {
         expiresIn: "7days",
       });
     }
@@ -59,11 +59,11 @@ export const googleAuth = async (req: any, res: any) => {
         };
         const newUser = await User.create(newUserData);
   
-        token = jwt.sign({ userId: newUser.id }, String(process.env.SECRET), {
+        token = jwt.sign({ userId: newUser.id }, process.env.SECRET!, {
           expiresIn: "7days",
         });
       } else {
-        token = jwt.sign({ userId: user.id }, String(process.env.SECRET), {
+        token = jwt.sign({ userId: user.id }, process.env.SECRET!, {
           expiresIn: "7days",
         });
       }

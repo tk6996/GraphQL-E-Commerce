@@ -6,7 +6,7 @@ const getUser = (token: string | undefined) => {
   try {
     const decodedToken: any = jwt.verify(
       parsedToken,
-      String(process.env.SECRET)
+      process.env.SECRET!
     );
     return decodedToken.userId;
   } catch (error) {

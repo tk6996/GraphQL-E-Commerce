@@ -3,14 +3,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const omise = OmiseFn({
-  publicKey: String(process.env.OMISE_PUBLIC_KEY),
-  secretKey: String(process.env.OMISE_SECRET_KEY),
+  publicKey: process.env.OMISE_PUBLIC_KEY!,
+  secretKey: process.env.OMISE_SECRET_KEY!,
 });
 
 export const retrieveCustomer = (id: String | null) => {
   if (!id) return null;
-  return new Promise<OmiseFn.Customers.ICustomer | null>((resolve, reject) => {
-    omise.customers.retrieve(id.toString(), function (err, resp) {
+  return new Promise<OmiseFn.Customers.ICustomer | null>((resolve, _reject) => {
+    omise.customers.retrieve(id.toString(), function (_err, resp) {
       if (resp) resolve(resp);
       else resolve(null);
     });
@@ -22,8 +22,8 @@ export const createCustomer = (
   email: string,
   description: string
 ) => {
-  return new Promise<OmiseFn.Customers.ICustomer | null>((resolve, reject) =>
-    omise.customers.create({ card, email, description }, function (err, resp) {
+  return new Promise<OmiseFn.Customers.ICustomer | null>((resolve, _reject) =>
+    omise.customers.create({ card, email, description }, function (_err, resp) {
       if (resp) {
         resolve(resp);
       } else {
@@ -37,9 +37,9 @@ export const createChargeCredit = (
   amount: number,
   customer: string | undefined
 ) => {
-  return new Promise<any>((resolve, reject) =>
+  return new Promise<any>((resolve, _reject) =>
     omise.charges.create({ amount, currency: "thb", customer }, function (
-      err,
+      _err,
       resp
     ) {
       if (resp) {
@@ -56,10 +56,10 @@ export const createChargeInternetBanking = (
   source: string | undefined,
   return_uri: string | undefined
 ) => {
-  return new Promise<any>((resolve, reject) =>
+  return new Promise<any>((resolve, _reject) =>
     omise.charges.create(
       { amount, currency: "thb", source, return_uri },
-      function (err, resp) {
+      function (_err, resp) {
         if (resp) {
           resolve(resp);
         } else {

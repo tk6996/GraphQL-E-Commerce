@@ -10,7 +10,7 @@ const { MOGODB_NAME, MOGODB_PASSWORD, MOGODB_USER, PORT, HOST } = process.env;
 
 facebookPassportConfig();
 googlePassportConfig();
-//Create ServerS
+//Create Server
 const createServer = async () => {
   try {
     await mongoose.connect(

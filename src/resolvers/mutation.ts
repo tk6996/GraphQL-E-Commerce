@@ -16,7 +16,7 @@ import OrderItem from "../models/orderItem";
 import Order from "../models/order";
 
 const Mutation = {
-  signup: async (parent: any, args: any, context: any, info: any) => {
+  signup: async (_parent: any, args: any, _context: any, _info: any) => {
     const email: string = args.email.trim().toLowerCase();
     const currentUsers = await User.find({});
     const isEmailExist =
@@ -32,7 +32,7 @@ const Mutation = {
     return User.create({ ...args, email, password });
   },
 
-  login: async (parent: any, args: any, context: any, info: any) => {
+  login: async (_parent: any, args: any, _context: any, _info: any) => {
     const { email, password } = args;
 
     const user = await User.findOne({ email })
@@ -56,7 +56,7 @@ const Mutation = {
 
     if (!vaildPassword) throw new Error("Invalid email or password.");
 
-    const token = jwt.sign({ userId: user.id }, String(process.env.SECRET), {
+    const token = jwt.sign({ userId: user.id }, process.env.SECRET!, {
       expiresIn: "7days",
     });
 
@@ -64,10 +64,10 @@ const Mutation = {
   },
 
   requestResetPassword: async (
-    parent: any,
+    _parent: any,
     args: any,
-    context: any,
-    info: any
+    _context: any,
+    _info: any
   ) => {
     const { email } = args;
     const user = await User.findOne({ email });
@@ -81,10 +81,10 @@ const Mutation = {
       resetTokenExpiry,
     });
 
-    sgMail.setApiKey(String(process.env.API_KEY_SENT_GRID));
+    sgMail.setApiKey(process.env.API_KEY_SENT_GRID!);
 
     const message = {
-      from: String(process.env.MY_EMAIL),
+      from: process.env.MY_EMAIL!,
       to: user.email,
       subject: "Reset password link",
       html: `
@@ -99,7 +99,7 @@ const Mutation = {
     return { message: "Please check your email to proceed reset password." };
   },
 
-  resetPassword: async (parent: any, args: any, context: any, info: any) => {
+  resetPassword: async (_parent: any, args: any, _context: any, _info: any) => {
     const { password, token } = args;
 
     if (password.trim().length < 6)
@@ -127,7 +127,7 @@ const Mutation = {
     };
   },
 
-  createProduct: async (parent: any, args: any, context: any, info: any) => {
+  createProduct: async (_parent: any, args: any, context: any, _info: any) => {
     const { userId } = context;
     if (!userId) throw new Error("Please log in.");
 
@@ -152,7 +152,7 @@ const Mutation = {
     });
   },
 
-  updateProduct: async (parent: any, args: any, context: any, info: any) => {
+  updateProduct: async (_parent: any, args: any, context: any, _info: any) => {
     const { userId } = context;
     if (!userId) throw new Error("Please log in.");
 
@@ -181,7 +181,7 @@ const Mutation = {
     return updateProduct;
   },
 
-  deleteProduct: async (parent: any, args: any, context: any, info: any) => {
+  deleteProduct: async (_parent: any, args: any, context: any, _info: any) => {
     const product = await Product.findById(args.id);
     if (!product) throw new Error("Product id invalid.");
 
@@ -221,7 +221,7 @@ const Mutation = {
     return deleteProduct;
   },
 
-  addToCart: async (parent: any, args: any, context: any, info: any) => {
+  addToCart: async (_parent: any, args: any, context: any, _info: any) => {
     const { id } = args;
     const { userId } = context;
     if (!userId) throw new Error("Please log in.");
@@ -281,7 +281,7 @@ const Mutation = {
     }
   },
 
-  deleteCart: async (parent: any, args: any, context: any, info: any) => {
+  deleteCart: async (_parent: any, args: any, context: any, _info: any) => {
     const { id } = args;
     const { userId } = context;
     if (!userId) throw new Error("Please log in.");
@@ -307,7 +307,7 @@ const Mutation = {
     return deleteCart;
   },
 
-  createOrder: async (parent: any, args: any, context: any, info: any) => {
+  createOrder: async (_parent: any, args: any, context: any, _info: any) => {
     const { amount, cardId, token, return_uri } = args;
     const { userId } = context;
     if (!userId) throw new Error("Please log in.");

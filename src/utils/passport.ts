@@ -6,13 +6,13 @@ export const facebookPassportConfig = () => {
   return passport.use(
     new FacebookStrategy(
       {
-        clientID: String(process.env.FACEBOOK_APP_ID),
-        clientSecret: String(process.env.FACEBOOK_APP_SECRET),
+        clientID: process.env.FACEBOOK_APP_ID!,
+        clientSecret: process.env.FACEBOOK_APP_SECRET!,
         callbackURL: `http://${process.env.HOST}:${process.env.PORT}/auth/facebook/callback`,
         profileFields: ['id', 'displayName', 'name', 'emails'],
         passReqToCallback: true,
       },
-      (req, accessToken, refreshToken, profile, done) => {
+      (req, _accessToken, _refreshToken, profile, done) => {
         try {
           if (profile) {
             req.user = profile;
@@ -30,12 +30,12 @@ export const googlePassportConfig = () => {
   return passport.use(
     new GoogleStragtegy(
       {
-        clientID: String(process.env.GOOGLE_CLIENT_ID),
-        clientSecret: String(process.env.GOOGLE_CLIENT_SECRET),
+        clientID: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         callbackURL: `http://${process.env.HOST}:${process.env.PORT}/auth/google/callback`,
         passReqToCallback: true,
       },
-      (req, accessToken, refreshToken, profile, done) => {
+      (req, _accessToken, _refreshToken, profile, done) => {
         try {
           if (profile) {
             req.user = profile;
