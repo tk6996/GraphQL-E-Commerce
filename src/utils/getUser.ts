@@ -4,10 +4,9 @@ const getUser = (token: string | undefined) => {
   if (!token) return null;
   const parsedToken = token.split(" ")[1];
   try {
-    const decodedToken: any = jwt.verify(
-      parsedToken,
-      process.env.SECRET!
-    );
+    const decodedToken = jwt.verify(parsedToken, process.env.SECRET!) as {
+      userId: string;
+    };
     return decodedToken.userId;
   } catch (error) {
     console.error(error);
